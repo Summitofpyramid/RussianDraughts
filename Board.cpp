@@ -22,6 +22,9 @@ class board{
 public:
     unordered_map<int,piece*> dark_normal, light_normal;
     unordered_map<int,piece*> dark_king, light_king;
+    // in this version the board will be represented as a vector of vector
+    // of char, where M: dark man, K: dark King, N: light man, Q: light king
+    
     board(){
         for(int i=0;i<8;++i){
             for(int j=0;j<8;++j){
