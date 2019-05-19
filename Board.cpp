@@ -12,30 +12,35 @@
 #include <stdio.h>
 #include <vector>
 #include <iostream>
-#include <unordered_map>
-#include "Piece.cpp"
+#include <unordered_set>
+#include <string>
 
 using namespace std;
 
+#define SPACE "  "
+
 class board{
-    vector<vector<int>> positions=vector<vector<int>>(8, vector<int>(8, 0));
 public:
-    unordered_map<int,piece*> dark_normal, light_normal;
-    unordered_map<int,piece*> dark_king, light_king;
+    vector<vector<string>> positions=vector<vector<string>>(8, vector<string>(8, SPACE));
+    unordered_set<int> dark_normal, light_normal;
+    unordered_set<int> dark_king, light_king;
     // in this version the board will be represented as a vector of vector
-    // of char, where M: dark man, K: dark King, N: light man, Q: light king
+    // of string, where DM: dark man, DK: dark King, LM: light man, LK: light king
     
     board(){
         for(int i=0;i<8;++i){
             for(int j=0;j<8;++j){
                 if(((i&1)==0&&(j&1)==1)||
-                   ((i&1)==1&&(j&1)==0))
-                    positions[i][j] = 1;
-                
-                if(i<3&&positions[i][j])
-                    dark_normal[8*i+j] = new piece(i,j,true,false);
-                else if(i>4&&positions[i][j])
-                    light_normal[8*i+j] = new piece(i,j,true,true);
+                   ((i&1)==1&&(j&1)==0)){
+                    if(i<3){
+                        positions[i][j] = "DM";
+                        dark_normal.insert(8*i+j);
+                    }
+                    else if(i>4){
+                        positions[i][j] = "LM";
+                        light_normal.insert(8*i+j);
+                    }
+                }
             }
         }
     }

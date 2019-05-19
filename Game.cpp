@@ -10,9 +10,7 @@
 
 #include <stdio.h>
 #include "Board.cpp"
-#include "Piece.cpp"
 #include "Node.cpp"
-#include <unordered_map>
 
 class game{
     board *B;
@@ -32,8 +30,9 @@ public:
     };
     
     void printPositions(){
-        cout<<"D0: dark normal pieces, D1: dark queen, L0: light normal pieces, L1: light queen pieces"<<endl;
-        cout<<"the index of the top-left of the board is [0,0], and increases from left to right and top to bottom!"<<endl;
+        cout<<"DM: dark man pieces, DK: dark king, LM: light man pieces, L1: light king pieces"<<endl;
+        cout<<"the index of the top-left of the board is [0,0], and increases from left to right\n";
+        cout<<"and top to bottom!"<<endl;
         cout<<"   ";
         for(int c=0;c<8;++c)
             cout<<c<<"  ";
@@ -41,17 +40,7 @@ public:
         for(int r=0; r<8;++r){
             cout<<r<<"  ";
             for(int c=0;c<8;++c){
-                if(B->dark_normal.count(r*8+c))
-                    cout<<"D0";
-                else if(B->light_normal.count(r*8+c))
-                    cout<<"L0";
-                else if(B->dark_king.count(r*8+c))
-                    cout<<"D1";
-                else if(B->light_king.count(r*8+c))
-                    cout<<"L1";
-                else
-                    cout<<"##";
-                cout<<" ";
+                cout<<B->positions[r][c]<<" ";
             }
             cout<<endl;
         }
@@ -64,21 +53,20 @@ public:
         while(!endGame){
             int idx = isLightTurnToMove;
             cout<<"It is " + names[idx] + " player's turn to move."<<endl;
-            piece* chosen = selectAPiecetoMove();
+            vector<int> chosen = selectAPiecetoMove();
             // in case the player has selected wrong pieces
-            while(!chosen){
+            while(chosen.empty()){
                 chosen = selectAPiecetoMove();
             }
-            move(chosen);
+            movePiece(chosen);
             isLightTurnToMove = !isLightTurnToMove;
             gameStatusCheck();
             printPositions();
         }
     }
     
-    piece* selectAPiecetoMove(){
+    vector<int> selectAPiecetoMove(){
         int x, y;
-        cout<<"Please select a piece to move!"<<endl;
         do{
             cout<<"Please input the row of the piece to move!"<<endl;
             cin>>x;
@@ -93,27 +81,21 @@ public:
                 cout<<"the col should be in the range [0, 7]";
         }while(y<0||y>=8);
         
-        int index = x*8+y;
         if(isLightTurnToMove){
-            if(B->light_normal.count(index))
-                return B->light_normal[index];
-            else if(B->light_king.count(index))
-                return B->light_king[index];
-            else{
+            if(B->positions[x][y]!="LM" || B->positions[x][y]=="LK"){
                 cout<<"The chosen piece is not a valid light piece!"<<endl;
-                return NULL;
+                return {};
             }
+            
         }else{
-            if(B->dark_normal.count(index))
-                return B->dark_normal[index];
-            else if(B->dark_king.count(index))
-                return B->dark_king[index];
-            else{
+            if(B->positions[x][y]!="DM" || B->positions[x][y]=="DK"){
                 cout<<"The chosen piece is not a valid dark piece!"<<endl;
-                return NULL;
+                return {};
             }
         }
+        return {x,y};
     }
+
     
 
     bool insideTheBoard(int x, int y){
@@ -121,34 +103,28 @@ public:
     }
     
     bool isEmpty(int x, int y){
-        int cur_index = 8*x+y;
-        return !B->light_normal.count(cur_index)&&
-        !B->light_king.count(cur_index)&&
-        !B->dark_normal.count(cur_index)&&
-        !B->dark_king.count(cur_index);
+        return B->positions[x][y]!="";
         
     }
     
-    bool belongToDifferentPlayer(piece* cur, int nextX, int nextY){
-        bool isLight = cur->getIsBelongingToLight();
-        return (isLight&&(B->dark_normal.count(8*nextX+nextY)||B->dark_king.count(8*nextX+nextY)))||
-                (!isLight&&(B->light_normal.count(8*nextX+nextY)||B->light_king.count(8*nextX+nextY)));
+    bool belongToDifferentPlayer(int x, int y, int nextX, int nextY){
+        return B->positions[nextX][nextY]!=SPACE && B->positions[x][y][0]!=B->positions[nextX][nextY][0];
     }
     
     
-    bool canAKingCapture(piece* cur){
+    bool canAKingCapture(int x, int y){
         for(auto dir:dirs){
-            int next_x = cur->getX()+dir[0];
-            int next_y = cur->getY()+dir[1];
+            int next_x = x;
+            int next_y = y;
 
-            while(insideTheBoard(next_x, next_y)&&isEmpty(next_x, next_y)){
-                next_x = cur->getX()+dir[0];
-                next_y = cur->getY()+dir[1];
+            while(insideTheBoard(next_x+dir[0], next_y+dir[1])&&isEmpty(next_x+dir[0], next_y+dir[1])){
+                next_x +=dir[0];
+                next_y +=dir[1];
             }
-            int next_of_next_x = cur->getX()+2*dir[0];
-            int next_of_next_y = cur->getY()+2*dir[1];
+            int next_of_next_x = next_x+2*dir[0];
+            int next_of_next_y = next_y+2*dir[1];
             
-            if(belongToDifferentPlayer(cur, next_x, next_y)&&
+            if(belongToDifferentPlayer(x,y,next_x, next_y)&&
                insideTheBoard(next_of_next_x,next_of_next_y)&&
                isEmpty(next_of_next_x, next_of_next_y))
                 return true;
@@ -156,13 +132,17 @@ public:
         return false;
     }
     
-    bool canAKingShift(piece* cur){
+    bool canAKingMove(int x, int y){
+        return canAPieceShift(x, y)||canAKingCapture(x, y);
+    }
+    
+    bool canAManCapture(int x, int y){
         for(auto dir:dirs){
-            int next_x = cur->getX()+dir[0];
-            int next_y = cur->getY()+dir[1];
-            int next_of_next_x = cur->getX()+2*dir[0];
-            int next_of_next_y = cur->getY()+2*dir[1];
-            if(belongToDifferentPlayer(cur, next_x, next_y)&&
+            int next_x = x+dir[0];
+            int next_y = y+dir[1];
+            int next_of_next_x = x+2*dir[0];
+            int next_of_next_y = y+2*dir[1];
+            if(belongToDifferentPlayer(x, y, next_x, next_y)&&
                insideTheBoard(next_of_next_x,next_of_next_y)&&
                isEmpty(next_of_next_x, next_of_next_y))
                 return true;
@@ -170,97 +150,119 @@ public:
         return false;
     }
     
-    bool canAKingMove(piece* cur){
-        return canAKingShift(cur)||canAKingCapture(cur);
-    }
-    
-    bool canAManCapture(piece* cur){
+    bool canAPieceShift(int x, int y){
         for(auto dir:dirs){
-            int next_x = cur->getX()+dir[0];
-            int next_y = cur->getY()+dir[1];
-            int next_of_next_x = cur->getX()+2*dir[0];
-            int next_of_next_y = cur->getY()+2*dir[1];
-            if(belongToDifferentPlayer(cur, next_x, next_y)&&
-               insideTheBoard(next_of_next_x,next_of_next_y)&&
-               isEmpty(next_of_next_x, next_of_next_y))
-                return true;
-        }
-        return false;
-    }
-    
-    bool canAManShift(piece* cur){
-        for(auto dir:dirs){
-            int next_x = cur->getX()+dir[0];
-            int next_y = cur->getY()+dir[1];
+            int next_x = x+dir[0];
+            int next_y = y+dir[1];
             if(insideTheBoard(next_x, next_y)&&isEmpty(next_x, next_y))
                 return true;
         }
         return false;
     }
     
-    bool canANormalPieceMove(piece* cur){
-        return canAManShift(cur)||canAManCapture(cur);
+    bool canANormalPieceMove(int x, int y){
+        return canAPieceShift(x, y)||canAManCapture(x, y);
     }
     
-    int inputDirectionIndex(piece* current_piece){
-        int dir_index;
-        if(current_piece->getNormal()){
-            if(current_piece->getIsBelongingToLight()){
+    int inputDirectionIndex(int x, int y){
+        int dir_index=-1;
+        if(B->positions[x][y][1]=='M'){
+            if(B->positions[x][y][0]=='L'){
                 do{
                     cin>>dir_index;
                     if(dir_index==2||dir_index==3)
                         cout<<"The direction index of light men piece can be only 0 or 1"<<endl;
                 }while(dir_index==2||dir_index==3);
-            }else{
+            }else if(B->positions[x][y][0]=='D'){
                 do{
                     cin>>dir_index;
                     if(dir_index==0||dir_index==1)
                         cout<<"The direction index of dark men piece can be only 2 or 3"<<endl;
                 }while(dir_index==0||dir_index==1);
             }
-        }else{
+        }else if(B->positions[x][y][1]=='K'){
             cout<<"Please input the direction index of this King!";
             cin>>dir_index;
         }
         return dir_index;
     }
     
-    void manCapture(piece* &cur, int x, int y){
-        int original_index = 8*cur->getX()+cur->getY();
-        int next_index = 8*(cur->getX()+x)+cur->getY()+y;
-        cur->setX(cur->getX()+2*x);
-        cur->setY(cur->getY()+2*y);
-        int next_next_index = 8*cur->getX()+cur->getY();
-        if((cur->getIsBelongingToLight()&&cur->getX()==0)||
-           (!cur->getIsBelongingToLight()&&cur->getX()==7))
-            cur->changeToKing();
+    void manOrKingShift(int x, int y, int new_x, int new_y){
+        int index = 8*x+y;
+        int new_index = 8*new_x+new_y;
+        if(B->positions[x][y][1]=='M'){
+            if(B->positions[x][y][0]=='L'){
+                B->light_normal.erase(index);
+                if(new_x==0){
+                    B->light_king.insert(new_index);
+                }else{
+                    B->light_normal.insert(new_index);
+                }
+            }else if(B->positions[x][y][0]=='D'){
+                B->dark_normal.erase(index);
+                if(new_x==7){
+                    B->dark_king.insert(new_index);
+                }else{
+                    B->dark_normal.insert(new_index);
+                }
+            }
+        }else if(B->positions[x][y][1]=='K'){
+            if(B->positions[x][y][0]=='L'){
+                B->light_normal.erase(index);
+                B->light_normal.insert(new_index);
+            }else if(B->positions[x][y][0]=='D'){
+                B->dark_normal.erase(index);
+                B->dark_normal.insert(new_index);
+            }
+        }
+        B->positions[new_x][new_y] = B->positions[x][y];
+        B->positions[x][y] = SPACE;
+        
+    }
+    
+    void manCapture(int x0, int y0, int x, int y){
+        int original_index = 8*x0+y0;
+        int next_index = 8*(x0+x)+y0+y;
+        int next_next_index = 8*(x0+2*x)+y0+2*y;
+        string tmp = B->positions[x0][y0];
 
-        if(cur->getIsBelongingToLight()){
+        if(B->positions[x0][y0][0]=='L'){
+            B->light_normal.erase(original_index);
             if(B->dark_normal.count(next_index))
                 B->dark_normal.erase(next_index);
             else
                 B->dark_king.erase(next_index);
-            B->light_normal.erase(original_index);
-            if(cur->getNormal())
-                B->light_normal[next_next_index] = cur;
-            else
-                B->light_king[next_next_index] = cur;
+            if(x0+2*x== 0){
+                B->positions[x0+2*x][y0+2*x] = "LK";
+                B->light_king.insert(next_next_index);
+            }else{
+                B->positions[x0+2*x][y0+2*x] = tmp;
+                B->light_normal.insert(next_next_index);
+            }
+            
         }else{
+            B->dark_normal.erase(original_index);
             if(B->light_normal.count(next_index))
                 B->light_normal.erase(next_index);
             else
                 B->light_king.erase(next_index);
-            B->dark_normal.erase(original_index);
-            if(cur->getNormal())
-                B->dark_normal[next_next_index] = cur;
-            else
-                B->dark_king[next_next_index] = cur;
+            
+            if(x0+2*x== 7){
+                B->positions[x0+2*x][y0+2*x] = "DK";
+                B->dark_king.insert(next_next_index);
+            }else{
+                B->positions[x0+2*x][y0+2*x] = tmp;
+                B->dark_normal.insert(next_next_index);
+            }
         }
+        B->positions[x0][y0] = SPACE;
+        B->positions[x0+x][y0+x] = tmp;
+        
     }
     
-    void kingCapture(piece* cur, int x, int y){
-        int original_index = 8*cur->getX()+cur->getY();
-        int capture_x = cur->getX(), capture_y=cur->getY();
+    void kingCapture(int x0, int y0, int x, int y){
+        int original_index = 8*x0+y0;
+        int capture_x = x0, capture_y=y0;
         while(insideTheBoard(capture_x+x, capture_y+y)&&isEmpty(capture_x+x, capture_y+y)){
             capture_x+=x;
             capture_y+=y;
@@ -269,78 +271,61 @@ public:
         if(!insideTheBoard(capture_x+x, capture_y+y)||!isEmpty(capture_x+x, capture_y+y))
             return;
         int next_index = 8*capture_x+capture_y;
-        cur->setX(capture_x+x);
-        cur->setY(capture_y+y);
-        int index_next_next = 8*cur->getX()+cur->getY();
-        if(cur->getIsBelongingToLight()){
+        B->positions[capture_x][capture_y]=SPACE;
+        int index_next_next = 8*(capture_x+x)+capture_y+y;
+        if(B->positions[x0][y0][0]=='L'){
             if(B->dark_normal.count(next_index))
                 B->dark_normal.erase(next_index);
             else
                 B->dark_king.erase(next_index);
             B->light_king.erase(original_index);
-            B->light_king[index_next_next]=cur;
+            B->light_king.insert(index_next_next);
         }else{
             if(B->light_normal.count(next_index))
                 B->light_normal.erase(next_index);
             else
                 B->light_king.erase(next_index);
             B->dark_king.erase(original_index);
-            B->dark_king[index_next_next]=cur;
+            B->dark_king.insert(index_next_next);
         }
     }
     
-    void manOrKingShift(piece* &current_piece, int new_x, int new_y){
-        int index = 8*current_piece->getX()+current_piece->getY();
-        current_piece->setX(new_x);
-        current_piece->setY(new_y);
-        int new_index = 8*current_piece->getX()+current_piece->getY();
-        if(current_piece->getIsBelongingToLight()){
-            B->light_normal.erase(index);
-            B->light_normal[new_index] = current_piece;
-        }else{
-            B->dark_normal.erase(index);
-            B->dark_normal[new_index] = current_piece;
-        }
-        
-        if((current_piece->getIsBelongingToLight()&&current_piece->getX()==0)||
-           (!current_piece->getIsBelongingToLight()&&current_piece->getX()==7))
-            current_piece->changeToKing();
-    }
 
-    void move(piece* &current_piece){
+
+    void movePiece(vector<int> p){
         int dir_index = -1;
         cout<<"---------Please input the index of direction--------"<<endl;
         cout<<"0: left-up, 1: right-up, 2: left-down, 3: right-down"<<endl;
-        if(current_piece->getNormal()){
-            if(canAManCapture(current_piece)){
-                while(canAManCapture(current_piece)){
-                    dir_index = inputDirectionIndex(current_piece);
-                    manCapture(current_piece, dirs[dir_index][0], dirs[dir_index][1]);
+        if(B->positions[p[0]][p[1]][1]=='M'){
+            if(canAManCapture(p[0], p[1])){
+                while(canAManCapture(p[0], p[1])){
+                    dir_index = inputDirectionIndex(p[0], p[1]);
+                    manCapture(p[0], p[1], dirs[dir_index][0], dirs[dir_index][1]);
                 }
-            }else if(canAManShift(current_piece)){
-                dir_index = inputDirectionIndex(current_piece);
-                int new_x = current_piece->getX()+dirs[dir_index][0];
-                int new_y = current_piece->getY()+dirs[dir_index][1];
-                manOrKingShift(current_piece, new_x, new_y);
+            }else if(canAPieceShift(p[0], p[1])){
+                dir_index = inputDirectionIndex(p[0], p[1]);
+                int new_x = p[0]+dirs[dir_index][0];
+                int new_y = p[1]+dirs[dir_index][1];
+                manOrKingShift(p[0], p[1], new_x, new_y);
             }
         }else{
-            if(canAKingCapture(current_piece)){
-                while((canAKingCapture(current_piece))){
-                    dir_index = inputDirectionIndex(current_piece);
-                    kingCapture(current_piece, dirs[dir_index][0], dirs[dir_index][1]);
+            if(canAKingCapture(p[0], p[1])){
+                while((canAKingCapture(p[0], p[1]))){
+                    dir_index = inputDirectionIndex(p[0], p[1]);
+                    kingCapture(p[0], p[1], dirs[dir_index][0], dirs[dir_index][1]);
                 }
             }
-            else if(canAKingShift(current_piece)){
+            else if(canAPieceShift(p[0], p[1])){
                 int next_x, next_y;
                 do{
-                    dir_index = inputDirectionIndex(current_piece);
+                    dir_index = inputDirectionIndex(p[0], p[1]);
                     cout<<"Please input the moving distance along this direction!"<<endl;
                     int dis;
                     cin>>dis;
-                    next_x = current_piece->getX() + dis*(dirs[dir_index][0]);
-                    next_y = current_piece->getY() + dis*(dirs[dir_index][1]);
+                    next_x = p[0] + dis*(dirs[dir_index][0]);
+                    next_y = p[1] + dis*(dirs[dir_index][1]);
                 }while(!insideTheBoard(next_x, next_y)||!isEmpty(next_x, next_y));
-                manOrKingShift(current_piece, next_x, next_y);
+                manOrKingShift(p[0], p[1], next_x, next_y);
             }
         }
     }
@@ -359,16 +344,16 @@ public:
             return;
         }
         // check if all light piece has no place to move
-        for(auto pair:B->light_normal){
-            if(canANormalPieceMove(pair.second)){
+        for(auto ind:B->light_normal){
+            if(canANormalPieceMove(ind/8, ind%8)){
                 light_nor = true;
                 break;
             }
             
         }
         
-        for(auto pair:B->light_king){
-            if(canAKingMove(pair.second)){
+        for(auto ind:B->light_king){
+            if(canAKingMove(ind/8, ind%8)){
                 light_que = true;
                 break;
             }
@@ -379,20 +364,20 @@ public:
             return;
         }
         // check if all dark piece has no place to move
-        for(auto pair:B->dark_normal){
-            if(canANormalPieceMove(pair.second)){
+        for(auto ind:B->dark_normal){
+            if(canANormalPieceMove(ind/8, ind%8)){
                 dark_nor = true;
                 break;
             }
         }
-
-        for(auto pair:B->dark_king){
-            if(canAKingMove(pair.second)){
+        
+        for(auto ind:B->dark_king){
+            if(canAKingMove(ind/8, ind%8)){
                 dark_que = true;
                 break;
             }
         }
-
+        
         if(!(dark_nor||dark_que)){
             endGame = true;
             return;
