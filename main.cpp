@@ -14,7 +14,7 @@ using namespace std;
 int main(int argc, const char * argv[]) {
     // insert code here...
     game *G = new game();
-    G->start();
+    G->startAuto();
     delete G;
     return 0;
 }

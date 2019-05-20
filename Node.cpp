@@ -14,16 +14,19 @@
 #include <unordered_map>
 
 class node{
-    string moveNotation;
-    board*  b;
-    unordered_map<string, board*> children;
+public:
+    board  b;
+    bool hasWinner;
+    bool tie;
+    unordered_map<string, node> children;
     node(){
-        moveNotation = "";
-        b = NULL;
+        hasWinner = false;
+        tie = false;
     }
-    node(string s, board* _b){
-        moveNotation = s;
+    node(board _b){
         b = _b;
+        hasWinner = false;
+        tie = false;
     }
 };
 
